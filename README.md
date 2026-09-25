@@ -1,4 +1,4 @@
-# 🚀 GoClean
+# GoClean
 
 **GoClean** is a blazing-fast, concurrent disk space analyzer and developer cache cleaner (`ncdu` + `dust` built on Go goroutines).
 
@@ -6,31 +6,31 @@ It scales filesystem metadata traversal across all CPU cores using an adaptive w
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-* ⚡ **Concurrent Goroutine Scanner**:
+* **Concurrent Goroutine Scanner**:
   * Traverses directory trees with a dynamic, starvation-free task queue and symlink/junction loop detection.
   * Significantly faster than single-threaded `filepath.WalkDir` on multi-core CPUs and fast NVMe/SSDs.
   * Configurable number of concurrent workers (defaults to `NumCPU * 2`).
-* 📊 **`dust`-Style CLI Mode**:
+* **`dust`-Style CLI Mode**:
   * Hierarchical directory tree rendering with branches (`├──`, `└──`).
   * Unicode usage bars `[████████░░░░] 68%` with colored thresholds (green → yellow → orange → red).
   * Direct badge highlights for trash/cache targets: `[CACHE: npm/node]`, `[CACHE: rust/cargo]`, etc.
-* 🖥️ **Full-Screen Interactive TUI (`-i`)**:
+* **Full-Screen Interactive TUI (`-i`)**:
   * Powered by `charmbracelet/bubbletea` and `lipgloss`.
   * Smooth arrow key navigation (`↑`/`↓`/`Enter`/`Esc` or `j`/`k`/`l`/`h`).
   * Instant sorting by size, name, or item count (`s`).
   * Live filter/search by filename (`/`).
   * One-key cache cleaning (`c`) with confirmation dialog.
   * Safe file/folder deletion (`d`) with protection prompt.
-* 🧹 **Smart & Safe Cache Cleaner**:
+* **Smart & Safe Cache Cleaner**:
   * Automatic detection rules: Node.js (`node_modules`, `.next`, `.nuxt`, `.turbo`, `.pnpm-store`), Rust (`target`), Python (`__pycache__`, `.pytest_cache`, `.venv`), Java/Kotlin (`.gradle`, `build`), Go/.NET/C++ (`.cache`, `bin`, `obj`), etc.
   * Dry-run mode (`--dry-run`): inspect what would be deleted and the reclaimable size without touching disk.
   * Protected root paths safeguard (`C:\`, `/`, `Windows`, `Program Files`, `$HOME` entirely).
 
 ---
 
-## 🛠️ Installation
+## Installation
 
 ### Option 1: npm / bun / npx (Cross-Platform)
 
@@ -92,7 +92,7 @@ go build -o goclean.exe ./cmd/goclean
 
 ---
 
-## 📖 Usage Examples
+## Usage Examples
 
 ### 1. Fast Disk Analysis (`dust` mode)
 ```bash
@@ -158,7 +158,7 @@ goclean --clean-cache -y
 
 ---
 
-## ⚙️ Command-Line Flags
+## Command-Line Flags
 
 | Flag | Description | Default |
 |---|---|---|
@@ -170,11 +170,3 @@ goclean --clean-cache -y
 | `-y` | Automatically confirm deletion prompts | `false` |
 
 ---
-
-## 🧪 Running Tests
-
-All modules are built with Test-Driven Development and verified with the Go race detector:
-
-```bash
-go test -v -race ./...
-```
