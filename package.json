@@ -1,0 +1,33 @@
+{
+  "name": "goclean-cli",
+  "version": "1.0.0",
+  "description": "Blazing-fast concurrent disk space analyzer and developer cache cleaner",
+  "main": "bin/goclean.js",
+  "bin": {
+    "goclean": "bin/goclean.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install-binary.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jalioba/GoClean.git"
+  },
+  "keywords": [
+    "ncdu",
+    "dust",
+    "disk-analyzer",
+    "disk-usage",
+    "cache-cleaner",
+    "cleanup",
+    "cli",
+    "tui"
+  ],
+  "author": "jalioba",
+  "license": "MIT",
+  "files": [
+    "bin",
+    "scripts",
+    "README.md"
+  ]
+}

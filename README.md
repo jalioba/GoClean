@@ -30,16 +30,63 @@ It scales filesystem metadata traversal across all CPU cores using an adaptive w
 
 ---
 
-## 🛠️ Installation & Build
+## 🛠️ Installation
 
-Requires **Go 1.22+**:
+### Option 1: npm / bun / npx (Cross-Platform)
+
+Run instantly without installation:
+```bash
+npx goclean-cli
+# or with bun:
+bunx goclean-cli
+```
+
+Or install globally:
+```bash
+npm install -g goclean-cli
+# or with bun:
+bun add -g goclean-cli
+```
+
+---
+
+### Option 2: Homebrew (macOS / Linux)
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/GoClean.git
-cd GoClean
+brew install jalioba/tap/goclean
+```
 
-# Build executable
+---
+
+### Option 3: Shell Installer (Linux & macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jalioba/GoClean/main/install.sh | bash
+```
+
+---
+
+### Option 4: PowerShell Installer (Windows)
+
+```powershell
+irm https://raw.githubusercontent.com/jalioba/GoClean/main/install.ps1 | iex
+```
+
+---
+
+### Option 5: Go Install (Go 1.22+)
+
+```bash
+go install github.com/jalioba/GoClean/cmd/goclean@latest
+```
+
+---
+
+### Option 6: Build from Source
+
+```bash
+git clone https://github.com/jalioba/GoClean.git
+cd GoClean
 go build -o goclean.exe ./cmd/goclean
 ```
 
