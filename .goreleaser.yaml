@@ -46,6 +46,8 @@ changelog:
       - "^test:"
       - "^chore:"
 
+# Homebrew tap formula generation
+# Create https://github.com/jalioba/homebrew-tap repository to enable auto-push
 brews:
   - name: goclean
     repository:
@@ -55,8 +57,10 @@ brews:
     homepage: "https://github.com/jalioba/GoClean"
     description: "Concurrent disk space analyzer and developer cache cleaner"
     license: "MIT"
-    folder: Formula
+    skip_upload: true
 
+# Scoop bucket manifest generation
+# Create https://github.com/jalioba/scoop-bucket repository to enable auto-push
 scoops:
   - repository:
       owner: jalioba
@@ -65,3 +69,4 @@ scoops:
     homepage: "https://github.com/jalioba/GoClean"
     description: "Concurrent disk space analyzer and developer cache cleaner"
     license: "MIT"
+    skip_upload: true
