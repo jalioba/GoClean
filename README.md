@@ -1,132 +1,132 @@
 # 🚀 GoClean
 
-**GoClean** — это сверхбыстрый параллельный анализатор дискового пространства и очиститель кэша разработки (`ncdu` + `dust` на горутинах), написанный на Go.
+**GoClean** is a blazing-fast, concurrent disk space analyzer and developer cache cleaner (`ncdu` + `dust` built on Go goroutines).
 
-Инструмент распределяет чтение метаданных файловой системы по всем ядрам процессора через адаптивный пул воркеров, визуализирует распределение дискового пространства процентными полосами из псевдографики и позволяет мгновенно находить и очищать раздутые кэши (`node_modules`, `target`, `.cache`, `.next`, `__pycache__` и др.).
-
----
-
-## ✨ Основные возможности
-
-* ⚡ **Параллельное сканирование на горутинах**:
-  * Обход каталогов с динамической очередью задач и защитой от зацикливания в симлинках.
-  * Значительно быстрее однопоточного `filepath.WalkDir` на многоядерных процессорах и быстрых NVMe/SSD.
-  * Настраиваемое количество параллельных воркеров (по умолчанию `NumCPU * 2`).
-* 📊 **Режим CLI в стиле `dust`**:
-  * Иерархическое дерево каталогов с ветвями (`├──`, `└──`).
-  * Псевдографические полосы заполнения `[████████░░░░] 68%` с цветовой индикацией (зелёный → желтый → красный).
-  * Мгновенная подсветка мусорных директорий тегами `[CACHE: npm/node]`, `[CACHE: rust/cargo]` и др.
-* 🖥️ **Полноэкранный интерактивный TUI в стиле `ncdu` (`-i`)**:
-  * Реализован на современном терминальном стеке `charmbracelet/bubbletea` и `lipgloss`.
-  * Удобная навигация стрелками (`↑`/`↓`/`Enter`/`Esc` или `j`/`k`/`l`/`h`).
-  * Сортировка по размеру, имени или количеству файлов (`s`).
-  * Мгновенный поиск/фильтрация по названию (`/`).
-  * Очистка найденных кэшей одной клавишей (`c`) с модальным окном подтверждения.
-  * Удаление любой выбранной папки/файла (`d`) с защитой от случайного нажатия.
-* 🧹 **Умная и безопасная очистка кэшей**:
-  * Автоматическое распознавание кэшей: Node.js (`node_modules`, `.next`, `.nuxt`, `.turbo`, `.pnpm-store`), Rust (`target`), Python (`__pycache__`, `.pytest_cache`, `.venv`), Java/Kotlin (`.gradle`, `build`), Go/.NET/C++ (`.cache`, `bin`, `obj`) и др.
-  * Режим сухого прогона (`--dry-run`): безопасный просмотр объема освобождаемого места без удаления файлов.
-  * Защита критических системных каталогов (`C:\`, `/`, `Windows`, `Program Files`, `$HOME` целиком).
+It scales filesystem metadata traversal across all CPU cores using an adaptive worker pool, visualizes disk usage with pseudographic percentage bars, and provides instant detection and cleaning of bloated developer caches (`node_modules`, `target`, `.cache`, `.next`, `__pycache__`, etc.).
 
 ---
 
-## 🛠️ Сборка и установка
+## ✨ Key Features
 
-Требуется установленный **Go 1.22+**:
+* ⚡ **Concurrent Goroutine Scanner**:
+  * Traverses directory trees with a dynamic, starvation-free task queue and symlink/junction loop detection.
+  * Significantly faster than single-threaded `filepath.WalkDir` on multi-core CPUs and fast NVMe/SSDs.
+  * Configurable number of concurrent workers (defaults to `NumCPU * 2`).
+* 📊 **`dust`-Style CLI Mode**:
+  * Hierarchical directory tree rendering with branches (`├──`, `└──`).
+  * Unicode usage bars `[████████░░░░] 68%` with colored thresholds (green → yellow → orange → red).
+  * Direct badge highlights for trash/cache targets: `[CACHE: npm/node]`, `[CACHE: rust/cargo]`, etc.
+* 🖥️ **Full-Screen Interactive TUI (`-i`)**:
+  * Powered by `charmbracelet/bubbletea` and `lipgloss`.
+  * Smooth arrow key navigation (`↑`/`↓`/`Enter`/`Esc` or `j`/`k`/`l`/`h`).
+  * Instant sorting by size, name, or item count (`s`).
+  * Live filter/search by filename (`/`).
+  * One-key cache cleaning (`c`) with confirmation dialog.
+  * Safe file/folder deletion (`d`) with protection prompt.
+* 🧹 **Smart & Safe Cache Cleaner**:
+  * Automatic detection rules: Node.js (`node_modules`, `.next`, `.nuxt`, `.turbo`, `.pnpm-store`), Rust (`target`), Python (`__pycache__`, `.pytest_cache`, `.venv`), Java/Kotlin (`.gradle`, `build`), Go/.NET/C++ (`.cache`, `bin`, `obj`), etc.
+  * Dry-run mode (`--dry-run`): inspect what would be deleted and the reclaimable size without touching disk.
+  * Protected root paths safeguard (`C:\`, `/`, `Windows`, `Program Files`, `$HOME` entirely).
+
+---
+
+## 🛠️ Installation & Build
+
+Requires **Go 1.22+**:
 
 ```bash
-# Клонирование репозитория
+# Clone the repository
 git clone https://github.com/your-username/GoClean.git
 cd GoClean
 
-# Сборка бинарника
+# Build executable
 go build -o goclean.exe ./cmd/goclean
 ```
 
 ---
 
-## 📖 Примеры использования
+## 📖 Usage Examples
 
-### 1. Быстрый анализ текущей директории (режим `dust`)
+### 1. Fast Disk Analysis (`dust` mode)
 ```bash
 goclean
 ```
-Или с указанием пути и глубины дерева:
+Or specify path and depth limit:
 ```bash
 goclean -d 2 C:\Users\user\Projects
 ```
 
-Пример вывода:
+Sample output:
 ```text
-🔍 Сканирование C:\Users\user\Projects (воркеры: 16)...
-Размер      % Использования          Файлы  Путь
+🔍 Scanning C:\Users\user\Projects (workers: 16)...
+Size        % Usage                  Items  Path
 ────────────────────────────────────────────────
 14.82 GB    [████████████████████] 100.0%  142,503  📁 Projects
 7.41 GB     [██████████░░░░░░░░░░]  50.0%   78,410  ├── 📁 web-app
-4.20 GB     [█████░░░░░░░░░░░░░░░]  28.3%   64,120  │   ├── 📁 node_modules [CACHE: npm/node]
-2.10 GB     [███░░░░░░░░░░░░░░░░░]  14.2%   12,300  │   └── 📁 .next [CACHE: nextjs]
+4.20 GB     [█████░░░░░░░░░░░░░░░]  28.3%   64,120  │   ├── 📁 node_modules  [CACHE: npm/node]
+2.10 GB     [███░░░░░░░░░░░░░░░░░]  14.2%   12,300  │   └── 📁 .next  [CACHE: nextjs]
 5.12 GB     [███████░░░░░░░░░░░░░]  34.5%   42,100  └── 📁 rust-service
-3.80 GB     [█████░░░░░░░░░░░░░░░]  25.6%   38,400      └── 📁 target [CACHE: rust/cargo]
-⚡ Время сканирования: 0.42s | 📁 Директорий: 8,412 | 📄 Файлов: 142,503 | 💾 Всего: 14.82 GB
-💡 Найдено кэшей к очистке: 10.10 GB (3 папок)
+3.80 GB     [█████░░░░░░░░░░░░░░░]  25.6%   38,400      └── 📁 target  [CACHE: rust/cargo]
+⚡ Scan time: 0.42s | 📁 Dirs: 8,412 | 📄 Files: 142,503 | 💾 Total: 14.82 GB
+💡 Found caches to clean: 10.10 GB (3 dirs)
 ```
 
-### 2. Полноэкранный интерактивный TUI (режим `ncdu`)
+### 2. Full-Screen Interactive TUI (`ncdu` mode)
 ```bash
 goclean -i
 ```
-или для конкретной папки:
+Or browse a specific folder:
 ```bash
 goclean -i C:\Users\user\Projects
 ```
 
-#### Горячие клавиши в TUI:
-| Клавиша | Действие |
+#### TUI Keyboard Shortcuts:
+| Key | Action |
 |---|---|
-| `↑` / `k`, `↓` / `j` | Перемещение курсора по списку |
-| `Enter` / `→` / `l` | Войти в выбранную поддиректорию |
-| `Esc` / `←` / `h` | Выйти на уровень выше к родителю |
-| `s` | Переключить сортировку (по размеру / по имени / по числу файлов) |
-| `/` | Начать поиск / фильтрацию файлов по имени |
-| `c` | Открыть диалог очистки всех обнаруженных кэшей в текущей папке |
-| `d` | Удалить выбранный файл или директорию |
-| `q` / `Ctrl+C` | Выход из программы |
+| `↑` / `k`, `↓` / `j` | Move cursor up / down |
+| `Enter` / `→` / `l` | Enter selected directory |
+| `Esc` / `←` / `h` | Go up to parent directory |
+| `s` | Cycle sort criteria (by size / by name / by items count) |
+| `/` | Live filter / search by name |
+| `c` | Open dialog to clean all detected caches in current folder |
+| `d` | Delete selected directory or file |
+| `q` / `Ctrl+C` | Exit |
 
-### 3. Очистка кэшей через CLI
+### 3. Cleaning Caches via CLI
 
-**Сухой прогон (показывает, что будет удалено без изменений на диске):**
+**Dry-run (simulate and calculate reclaimable space without deleting):**
 ```bash
 goclean --clean-cache --dry-run
 ```
 
-**Интерактивная очистка (запрашивает подтверждение `[y/N]`):**
+**Interactive clean (prompts for confirmation `[y/N]`):**
 ```bash
 goclean --clean-cache
 ```
 
-**Пакетная очистка без подтверждения (для CI/скриптов):**
+**Batch clean without prompt (useful for CI/scripts):**
 ```bash
 goclean --clean-cache -y
 ```
 
 ---
 
-## ⚙️ Флаги командной строки
+## ⚙️ Command-Line Flags
 
-| Флаг | Описание | По умолчанию |
+| Flag | Description | Default |
 |---|---|---|
-| `-i` | Запустить полноэкранный интерактивный TUI-режим | `false` |
-| `-w <int>` | Количество параллельных воркеров | `NumCPU * 2` |
-| `-d <int>` | Максимальная глубина отображения дерева каталогов | `2` |
-| `--clean-cache` | Найти и очистить кэши проектов (`node_modules`, `target` и т.д.) | `false` |
-| `--dry-run` | Режим симуляции (не производить удаление на диске) | `false` |
-| `-y` | Автоматически подтверждать удаление | `false` |
+| `-i` | Launch interactive full-screen TUI mode (like ncdu) | `false` |
+| `-w <int>` | Number of concurrent scanner workers | `NumCPU * 2` |
+| `-d <int>` | Maximum directory tree display depth | `2` |
+| `--clean-cache` | Scan for and remove project caches (`node_modules`, `target`, etc.) | `false` |
+| `--dry-run` | Simulate deletion without removing files from disk | `false` |
+| `-y` | Automatically confirm deletion prompts | `false` |
 
 ---
 
-## 🧪 Запуск тестов
+## 🧪 Running Tests
 
-Все тесты разработаны по методологии TDD и верифицированы с детектором гонок:
+All modules are built with Test-Driven Development and verified with the Go race detector:
 
 ```bash
 go test -v -race ./...

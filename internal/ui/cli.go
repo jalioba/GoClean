@@ -38,7 +38,7 @@ func RenderCLITree(root *model.Node, maxDepth int, barWidth int) string {
 
 	var sb strings.Builder
 
-	header := fmt.Sprintf("%-10s  %-*s  %6s  %s", "Размер", barWidth+2, "% Использования", "Файлы", "Путь")
+	header := fmt.Sprintf("%-10s  %-*s  %6s  %s", "Size", barWidth+2, "% Usage", "Items", "Path")
 	sb.WriteString(headerStyle.Render(header))
 	sb.WriteString("\n")
 
@@ -112,7 +112,7 @@ func RenderCLITree(root *model.Node, maxDepth int, barWidth int) string {
 
 func RenderSummary(stats *model.ScanStats) string {
 	sep := dimStyle.Render(" | ")
-	summary := fmt.Sprintf("⚡ Время сканирования: %v%s📁 Директорий: %s%s📄 Файлов: %s%s💾 Всего: %s",
+	summary := fmt.Sprintf("⚡ Scan time: %v%s📁 Dirs: %s%s📄 Files: %s%s💾 Total: %s",
 		stats.Duration.Round(10*time.Millisecond),
 		sep,
 		FormatNumber(stats.TotalDirs),
@@ -123,9 +123,9 @@ func RenderSummary(stats *model.ScanStats) string {
 	)
 
 	if stats.CacheDirs > 0 {
-		summary += fmt.Sprintf("\n💡 Найдено кэшей к очистке: %s (%s)",
+		summary += fmt.Sprintf("\n💡 Found caches to clean: %s (%s)",
 			FormatBytes(stats.CacheBytes),
-			FormatNumber(stats.CacheDirs)+" папок",
+			FormatNumber(stats.CacheDirs)+" dirs",
 		)
 	}
 

@@ -63,13 +63,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.Sort {
 			case model.SortBySize:
 				m.Sort = model.SortByName
-				m.StatusMsg = "Сортировка: по имени"
+				m.StatusMsg = "Sort: by name"
 			case model.SortByName:
 				m.Sort = model.SortByItems
-				m.StatusMsg = "Сортировка: по числу файлов"
+				m.StatusMsg = "Sort: by item count"
 			case model.SortByItems:
 				m.Sort = model.SortBySize
-				m.StatusMsg = "Сортировка: по размеру"
+				m.StatusMsg = "Sort: by size"
 			}
 			m.Current.SortChildren(m.Sort)
 
@@ -86,7 +86,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "c":
 			caches := cleaner.CollectCaches(m.Current)
 			if len(caches) == 0 {
-				m.StatusMsg = "В текущей папке кэшей не обнаружено"
+				m.StatusMsg = "No caches found in current directory"
 			} else {
 				var total int64
 				for _, c := range caches {
@@ -114,9 +114,9 @@ func (m Model) handleDialogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				target := items[m.Cursor]
 				err := cleaner.DeleteSafely(target.Path, false)
 				if err != nil {
-					m.StatusMsg = fmt.Sprintf("Ошибка удаления: %v", err)
+					m.StatusMsg = fmt.Sprintf("Delete error: %v", err)
 				} else {
-					m.StatusMsg = fmt.Sprintf("Удалено: %s", target.Name)
+					m.StatusMsg = fmt.Sprintf("Deleted: %s", target.Name)
 					m.removeNodeFromParent(target)
 				}
 			}
@@ -130,7 +130,7 @@ func (m Model) handleDialogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.removeNodeFromParent(c)
 				}
 			}
-			m.StatusMsg = fmt.Sprintf("Очищено %d кэшей, освобождено %s", deletedCount, ui.FormatBytes(reclaimed))
+			m.StatusMsg = fmt.Sprintf("Cleaned %d caches, reclaimed %s", deletedCount, ui.FormatBytes(reclaimed))
 		}
 		m.Dialog = DialogNone
 		m.Root.PostOrderAggregate()

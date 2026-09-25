@@ -32,17 +32,17 @@ var (
 
 func (m Model) View() string {
 	if m.Width == 0 {
-		return "Загрузка..."
+		return "Loading..."
 	}
 
 	var sb strings.Builder
 
-	header := fmt.Sprintf(" GoClean v1.0 ─ Каталог: %s ", m.Current.Path)
+	header := fmt.Sprintf(" GoClean v1.0 ─ Directory: %s ", m.Current.Path)
 	sb.WriteString(headerBoxStyle.Width(m.Width).Render(header))
 	sb.WriteString("\n")
 
 	tableHeader := fmt.Sprintf("  %-30s  %10s  %-15s  %6s  %s",
-		"Имя", "Размер", "% Использования", "Файлы", "Метка")
+		"Name", "Size", "% Usage", "Items", "Badge")
 	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(tableHeader))
 	sb.WriteString("\n")
 
@@ -84,7 +84,7 @@ func (m Model) View() string {
 
 		tag := ""
 		if item.IsCache {
-			tag = fmt.Sprintf("[КЭШ: %s]", item.CacheKind)
+			tag = fmt.Sprintf("[CACHE: %s]", item.CacheKind)
 		}
 
 		row := fmt.Sprintf(" %s%-28s  %10s  [%s] %s  %6s  %s",
@@ -111,9 +111,9 @@ func (m Model) View() string {
 		sb.WriteString("\n")
 	}
 
-	help := "[↑/↓/j/k] Перемещение | [Enter/→] Войти | [Esc/←] Назад | [s] Сортировка | [c] Очистить кэши | [d] Удалить | [q] Выход"
+	help := "[↑/↓/j/k] Navigate | [Enter/→] Open | [Esc/←] Back | [s] Sort | [c] Clean Caches | [d] Delete | [q] Quit"
 	if m.Filtering {
-		help = fmt.Sprintf("🔍 Поиск: %s_ [Esc - закрыть]", m.Filter)
+		help = fmt.Sprintf("🔍 Search: %s_ [Esc to cancel]", m.Filter)
 	}
 	sb.WriteString(footerBoxStyle.Width(m.Width).Render(help))
 
