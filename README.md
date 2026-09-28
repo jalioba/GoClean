@@ -36,16 +36,16 @@ It scales filesystem metadata traversal across all CPU cores using an adaptive w
 
 Run instantly without installation:
 ```bash
-npx goclean
+npx @jalioba/goclean
 # or with bun:
-bunx goclean
+bunx @jalioba/goclean
 ```
 
 Or install globally:
 ```bash
-npm install -g goclean
+npm install -g @jalioba/goclean
 # or with bun:
-bun add -g goclean
+bun add -g @jalioba/goclean
 ```
 
 ---
