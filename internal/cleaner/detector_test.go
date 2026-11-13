@@ -16,6 +16,10 @@ func TestIsCacheDir(t *testing.T) {
 		{".next", true, "nextjs"},
 		{"__pycache__", true, "python"},
 		{".venv", true, "python-venv"},
+		{".ruff_cache", true, "ruff"},
+		{".terraform", true, "terraform"},
+		{".dart_tool", true, "dart/flutter"},
+		{".zig-cache", true, "zig"},
 		{".cache", true, "general-cache"},
 		{"src", false, ""},
 		{"docs", false, ""},
@@ -24,6 +28,7 @@ func TestIsCacheDir(t *testing.T) {
 		{"bin", false, ""},
 		{"dist", false, ""},
 		{"build", false, ""},
+		{"Pods", false, ""},
 	}
 
 	for _, tt := range tests {

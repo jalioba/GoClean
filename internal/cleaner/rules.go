@@ -14,12 +14,28 @@ var DefaultCacheRules = map[string]string{
 	".nuxt":         "nuxtjs",
 	".turbo":        "turborepo",
 	".pnpm-store":   "pnpm",
+	".vite":         "vite",
+	".parcel-cache": "parcel",
+	".angular":      "angular",
+	".svelte-kit":   "sveltekit",
+	".astro":        "astro",
+	".nyc_output":   "js-coverage",
 	"__pycache__":   "python",
 	".pytest_cache": "pytest",
 	".mypy_cache":   "mypy",
+	".ruff_cache":   "ruff",
+	".tox":          "python-tox",
+	".nox":          "python-nox",
 	".venv":         "python-venv",
 	"venv":          "python-venv",
 	".gradle":       "gradle",
+	".dart_tool":    "dart/flutter",
+	".terraform":    "terraform",
+	".zig-cache":    "zig",
+	"zig-cache":     "zig",
+	"zig-out":       "zig",
+	"cmakefiles":    "cmake",
+	"deriveddata":   "xcode",
 	".cache":        "general-cache",
 	".ds_store":     "system",
 	"thumbs.db":     "system",
@@ -35,7 +51,8 @@ func MatchCacheRule(dirName string) (bool, string) {
 }
 
 // MatchCacheNode checks both unambiguous cache rules and context-aware rules
-// (e.g., "target" next to Cargo.toml/pom.xml, "bin"/"obj" next to .NET project files).
+// (e.g., "target" next to Cargo.toml/pom.xml, "bin"/"obj" next to .NET project files,
+// "build" next to pubspec.yaml/build.gradle/CMakeLists.txt, "Pods" next to Podfile).
 func MatchCacheNode(n *model.Node) (bool, string) {
 	if n == nil {
 		return false, ""
@@ -57,9 +74,26 @@ func MatchCacheNode(n *model.Node) (bool, string) {
 		if hasSibling(n.Parent, "pom.xml") {
 			return true, "java/maven"
 		}
+		if hasSibling(n.Parent, "build.sbt") {
+			return true, "scala/sbt"
+		}
 	case "bin", "obj":
 		if hasSiblingSuffix(n.Parent, ".csproj", ".fsproj", ".vbproj") {
 			return true, "dotnet-" + lower
+		}
+	case "build":
+		if hasSibling(n.Parent, "pubspec.yaml") {
+			return true, "flutter-build"
+		}
+		if hasSibling(n.Parent, "build.gradle") || hasSibling(n.Parent, "build.gradle.kts") {
+			return true, "gradle-build"
+		}
+		if hasSibling(n.Parent, "CMakeLists.txt") {
+			return true, "cmake-build"
+		}
+	case "pods":
+		if hasSibling(n.Parent, "Podfile") {
+			return true, "cocoapods"
 		}
 	}
 
