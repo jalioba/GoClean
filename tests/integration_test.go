@@ -24,6 +24,7 @@ func TestEndToEndCleanFlow(t *testing.T) {
 	os.MkdirAll(target, 0755)
 	os.MkdirAll(src, 0755)
 
+	os.WriteFile(filepath.Join(tmpDir, "Cargo.toml"), []byte("[package]\nname=\"demo\"\n"), 0644)
 	os.WriteFile(filepath.Join(nm, "mod.js"), make([]byte, 1024*10), 0644)
 	os.WriteFile(filepath.Join(target, "binary"), make([]byte, 1024*20), 0644)
 	os.WriteFile(filepath.Join(src, "main.go"), make([]byte, 1024*5), 0644)
@@ -40,27 +41,29 @@ func TestEndToEndCleanFlow(t *testing.T) {
 		t.Fatalf("expected 2 caches, got %d", len(caches))
 	}
 
-	if stats.TotalFiles != 3 {
-		t.Fatalf("expected 3 files, got %d", stats.TotalFiles)
+	if stats.TotalFiles != 4 {
+		t.Fatalf("expected 4 files, got %d", stats.TotalFiles)
 	}
 
 	// Test dry run delete
 	for _, c := range caches {
-		if err := cleaner.DeleteSafely(c.Path, true); err != nil {
+		p := c.FullPath()
+		if err := cleaner.DeleteSafely(p, true); err != nil {
 			t.Fatalf("dry run delete failed: %v", err)
 		}
-		if _, err := os.Stat(c.Path); os.IsNotExist(err) {
-			t.Fatalf("dry run should not delete %s", c.Path)
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			t.Fatalf("dry run should not delete %s", p)
 		}
 	}
 
 	// Test real delete
 	for _, c := range caches {
-		if err := cleaner.DeleteSafely(c.Path, false); err != nil {
+		p := c.FullPath()
+		if err := cleaner.DeleteSafely(p, false); err != nil {
 			t.Fatalf("real delete failed: %v", err)
 		}
-		if _, err := os.Stat(c.Path); !os.IsNotExist(err) {
-			t.Fatalf("real delete should remove %s", c.Path)
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Fatalf("real delete should remove %s", p)
 		}
 	}
 }
