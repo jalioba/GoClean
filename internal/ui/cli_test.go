@@ -38,4 +38,14 @@ func TestRenderCLITree(t *testing.T) {
 	if !strings.Contains(out, "[CACHE: npm/node]") {
 		t.Errorf("expected tree to highlight cache tag, got %s", out)
 	}
+
+	mini := RenderMiniTree(root, 2, 5)
+	if !strings.Contains(mini, "node_modules") || !strings.Contains(mini, "src") {
+		t.Errorf("expected mini tree to contain children, got %s", mini)
+	}
+
+	cachePreview := RenderCacheTreePreview(root, []*model.Node{cacheNode}, 5, 3)
+	if !strings.Contains(cachePreview, "node_modules") || !strings.Contains(cachePreview, "npm/node") {
+		t.Errorf("expected cache preview to contain node_modules and kind, got %s", cachePreview)
+	}
 }

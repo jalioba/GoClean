@@ -129,10 +129,12 @@ func (m Model) View() string {
 	sb.WriteString(footerBoxStyle.Width(m.Width).Render(help))
 
 	if m.Dialog == DialogDeleteTarget && len(items) > 0 && m.Cursor < len(items) {
-		return renderDeleteDialog(items[m.Cursor])
+		dialog := renderDeleteDialog(items[m.Cursor])
+		return lipgloss.Place(m.Width, m.Height, lipgloss.Center, lipgloss.Center, dialog)
 	}
 	if m.Dialog == DialogCleanAllCaches {
-		return renderCleanCachesDialog(m.TargetCaches, m.CacheBytes)
+		dialog := renderCleanCachesDialog(m.Current, m.TargetCaches, m.CacheBytes)
+		return lipgloss.Place(m.Width, m.Height, lipgloss.Center, lipgloss.Center, dialog)
 	}
 
 	return sb.String()

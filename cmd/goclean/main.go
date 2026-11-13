@@ -77,10 +77,8 @@ func main() {
 			return
 		}
 
-		fmt.Printf("\n🧹 Found %d cache directories totaling %s:\n", len(caches), ui.FormatBytes(cacheBytes))
-		for _, c := range caches {
-			fmt.Printf("  • %-30s [%s] (%s, %s items)\n", c.FullPath(), c.CacheKind, ui.FormatBytes(c.Size), ui.FormatNumber(c.ItemCount))
-		}
+		fmt.Printf("\n🧹 Found %d cache directories totaling %s:\n\n", len(caches), ui.FormatBytes(cacheBytes))
+		fmt.Println(ui.RenderCacheTreePreview(root, caches, 0, 4))
 
 		if *dryRun {
 			fmt.Printf("\n[DRY-RUN] No files were deleted. Run without --dry-run to clean.\n")

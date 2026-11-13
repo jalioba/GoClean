@@ -165,3 +165,170 @@ func RenderSummary(stats *model.ScanStats) string {
 
 	return summary
 }
+
+// RenderMiniTree builds a compact tree preview of a node and its top children by size,
+// used in deletion confirmation dialogs.
+func RenderMiniTree(root *model.Node, maxDepth int, maxChildren int) string {
+	if root == nil {
+		return ""
+	}
+	if maxDepth <= 0 {
+		maxDepth = 2
+	}
+	if maxChildren <= 0 {
+		maxChildren = 5
+	}
+	root.SortChildrenDepth(model.SortBySize, maxDepth)
+
+	var sb strings.Builder
+	rootIcon := "📁 "
+	if root.Type != model.NodeTypeDir {
+		rootIcon = "📄 "
+	}
+	sb.WriteString(fmt.Sprintf("%s%s (%s, %s items)\n",
+		rootIcon, root.Name, FormatBytes(root.Size), FormatNumber(root.ItemCount)))
+
+	var walk func(n *model.Node, depth int, prefix string)
+	walk = func(n *model.Node, depth int, prefix string) {
+		if n.Type != model.NodeTypeDir || depth > maxDepth || len(n.Children) == 0 {
+			return
+		}
+		limit := len(n.Children)
+		truncated := false
+		if limit > maxChildren {
+			limit = maxChildren
+			truncated = true
+		}
+
+		for i := 0; i < limit; i++ {
+			c := n.Children[i]
+			isLast := !truncated && (i == limit-1)
+			branch := prefix + "├── "
+			nextPrefix := prefix + "│   "
+			if isLast {
+				branch = prefix + "└── "
+				nextPrefix = prefix + "    "
+			}
+			icon := "📁 "
+			if c.Type != model.NodeTypeDir {
+				icon = "📄 "
+			}
+			sb.WriteString(fmt.Sprintf("%s%s%s (%s)\n", branch, icon, c.Name, FormatBytes(c.Size)))
+			if c.Type == model.NodeTypeDir && depth < maxDepth {
+				walk(c, depth+1, nextPrefix)
+			}
+		}
+
+		if truncated {
+			var remSize int64
+			for i := limit; i < len(n.Children); i++ {
+				remSize += n.Children[i].Size
+			}
+			remCount := len(n.Children) - limit
+			sb.WriteString(fmt.Sprintf("%s└── %s\n",
+				prefix,
+				dimStyle.Render(fmt.Sprintf("... and %d more items (%s)", remCount, FormatBytes(remSize))),
+			))
+		}
+	}
+
+	walk(root, 1, "")
+	return strings.TrimRight(sb.String(), "\n")
+}
+
+// RenderCacheTreePreview renders a mini-tree of cache directories and their largest internal files/subfolders.
+func RenderCacheTreePreview(baseRoot *model.Node, caches []*model.Node, maxCaches int, maxChildren int) string {
+	if len(caches) == 0 {
+		return ""
+	}
+	if maxChildren <= 0 {
+		maxChildren = 3
+	}
+
+	var basePath string
+	if baseRoot != nil {
+		basePath = baseRoot.FullPath()
+	}
+
+	limitCaches := len(caches)
+	truncatedCaches := false
+	if maxCaches > 0 && limitCaches > maxCaches {
+		limitCaches = maxCaches
+		truncatedCaches = true
+	}
+
+	var sb strings.Builder
+	for idx := 0; idx < limitCaches; idx++ {
+		c := caches[idx]
+		c.SortChildrenDepth(model.SortBySize, 1)
+
+		isLastCache := !truncatedCaches && (idx == limitCaches-1)
+		cacheBranch := "├── "
+		childPrefix := "│   "
+		if isLastCache {
+			cacheBranch = "└── "
+			childPrefix = "    "
+		}
+
+		displayPath := c.FullPath()
+		if basePath != "" && strings.HasPrefix(displayPath, basePath) && displayPath != basePath {
+			rel := strings.TrimPrefix(displayPath, basePath)
+			rel = strings.TrimLeft(rel, "/\\")
+			if rel != "" {
+				displayPath = rel
+			}
+		}
+
+		sb.WriteString(fmt.Sprintf("%s📁 %s [%s] (%s, %s items)\n",
+			cacheBranch,
+			displayPath,
+			c.CacheKind,
+			FormatBytes(c.Size),
+			FormatNumber(c.ItemCount),
+		))
+
+		limit := len(c.Children)
+		truncated := false
+		if limit > maxChildren {
+			limit = maxChildren
+			truncated = true
+		}
+		for i := 0; i < limit; i++ {
+			ch := c.Children[i]
+			isLast := !truncated && (i == limit-1)
+			branch := childPrefix + "├── "
+			if isLast {
+				branch = childPrefix + "└── "
+			}
+			icon := "📁 "
+			if ch.Type != model.NodeTypeDir {
+				icon = "📄 "
+			}
+			sb.WriteString(fmt.Sprintf("%s%s%s (%s)\n", branch, icon, ch.Name, FormatBytes(ch.Size)))
+		}
+		if truncated {
+			var remSize int64
+			for i := limit; i < len(c.Children); i++ {
+				remSize += c.Children[i].Size
+			}
+			remCount := len(c.Children) - limit
+			sb.WriteString(fmt.Sprintf("%s└── %s\n",
+				childPrefix,
+				dimStyle.Render(fmt.Sprintf("... and %d more items (%s)", remCount, FormatBytes(remSize))),
+			))
+		}
+	}
+
+	if truncatedCaches {
+		var remSize int64
+		for i := limitCaches; i < len(caches); i++ {
+			remSize += caches[i].Size
+		}
+		remCount := len(caches) - limitCaches
+		sb.WriteString(fmt.Sprintf("└── %s\n",
+			dimStyle.Render(fmt.Sprintf("... and %d more cache directories (%s)", remCount, FormatBytes(remSize))),
+		))
+	}
+
+	return strings.TrimRight(sb.String(), "\n")
+}
