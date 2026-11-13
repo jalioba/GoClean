@@ -332,3 +332,88 @@ func RenderCacheTreePreview(baseRoot *model.Node, caches []*model.Node, maxCache
 
 	return strings.TrimRight(sb.String(), "\n")
 }
+
+// RenderTopFiles renders a table of the largest individual files in the scanned tree.
+func RenderTopFiles(root *model.Node, limit int, barWidth int) string {
+	if root == nil {
+		return ""
+	}
+	if barWidth <= 0 {
+		barWidth = 20
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+
+	files := root.TopFiles(limit)
+	basePath := root.FullPath()
+
+	var sb strings.Builder
+	header := fmt.Sprintf("%-10s  %-*s  %s", "Size", barWidth+2, "% Usage", "File Path")
+	sb.WriteString(headerStyle.Render(header))
+	sb.WriteString("\n")
+
+	for _, f := range files {
+		ratio := float64(0)
+		if root.Size > 0 {
+			ratio = float64(f.Size) / float64(root.Size)
+		}
+		bar := RenderBar(ratio, barWidth, true)
+		pct := FormatPercent(ratio)
+
+		displayPath := f.FullPath()
+		if basePath != "" && strings.HasPrefix(displayPath, basePath) && displayPath != basePath {
+			rel := strings.TrimPrefix(displayPath, basePath)
+			rel = strings.TrimLeft(rel, "/\\")
+			if rel != "" {
+				displayPath = rel
+			}
+		}
+
+		sb.WriteString(fmt.Sprintf("%-10s  [%s] %s  📄 %s\n",
+			FormatBytes(f.Size),
+			bar,
+			pct,
+			displayPath,
+		))
+	}
+	return sb.String()
+}
+
+// RenderExtensionStats renders a table of disk usage grouped by file extension.
+func RenderExtensionStats(root *model.Node, limit int, barWidth int) string {
+	if root == nil {
+		return ""
+	}
+	if barWidth <= 0 {
+		barWidth = 20
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+
+	stats := root.ExtensionStats(limit)
+
+	var sb strings.Builder
+	header := fmt.Sprintf("%-10s  %-*s  %8s  %s", "Size", barWidth+2, "% Usage", "Files", "Extension")
+	sb.WriteString(headerStyle.Render(header))
+	sb.WriteString("\n")
+
+	for _, st := range stats {
+		ratio := float64(0)
+		if root.Size > 0 {
+			ratio = float64(st.Size) / float64(root.Size)
+		}
+		bar := RenderBar(ratio, barWidth, true)
+		pct := FormatPercent(ratio)
+
+		sb.WriteString(fmt.Sprintf("%-10s  [%s] %s  %8s  %s\n",
+			FormatBytes(st.Size),
+			bar,
+			pct,
+			FormatNumber(st.Count),
+			st.Ext,
+		))
+	}
+	return sb.String()
+}

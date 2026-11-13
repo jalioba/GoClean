@@ -57,3 +57,24 @@ func TestFullPathAndRemoveChild(t *testing.T) {
 		t.Fatalf("expected root items=1 dirA items=0, got root=%d dirA=%d", root.ItemCount, dirA.ItemCount)
 	}
 }
+
+func TestTopFilesAndExtensionStats(t *testing.T) {
+	root := &Node{Name: "root", Path: "/tmp/root", Type: NodeTypeDir}
+	f1 := &Node{Name: "a.go", Type: NodeTypeFile, Size: 100, ItemCount: 1}
+	f2 := &Node{Name: "b.go", Type: NodeTypeFile, Size: 300, ItemCount: 1}
+	f3 := &Node{Name: "video.mp4", Type: NodeTypeFile, Size: 1000, ItemCount: 1}
+	root.AddChild(f1)
+	root.AddChild(f2)
+	root.AddChild(f3)
+	root.PostOrderAggregate()
+
+	top := root.TopFiles(2)
+	if len(top) != 2 || top[0].Name != "video.mp4" || top[1].Name != "b.go" {
+		t.Fatalf("unexpected TopFiles result: %+v", top)
+	}
+
+	exts := root.ExtensionStats(0)
+	if len(exts) != 2 || exts[0].Ext != ".mp4" || exts[1].Ext != ".go" || exts[1].Size != 400 || exts[1].Count != 2 {
+		t.Fatalf("unexpected ExtensionStats result: %+v", exts)
+	}
+}

@@ -22,6 +22,8 @@ func main() {
 	workers := flag.Int("w", 0, "Number of concurrent workers (default: NumCPU * 2)")
 	maxDepth := flag.Int("d", 2, "Maximum directory tree display depth")
 	maxItems := flag.Int("n", 15, "Maximum items to display per directory in CLI tree (0 = all)")
+	topFiles := flag.Bool("top-files", false, "Display top largest individual files")
+	showTypes := flag.Bool("types", false, "Display disk usage grouped by file extension")
 	cleanCache := flag.Bool("clean-cache", false, "Scan for and remove development caches (node_modules, target, etc.)")
 	dryRun := flag.Bool("dry-run", false, "Simulate deletion without removing files from disk")
 	yes := flag.Bool("y", false, "Automatic yes to confirmation prompts")
@@ -105,6 +107,16 @@ func main() {
 	}
 
 	// Default CLI output mode (dust style)
+	if *topFiles {
+		fmt.Print(ui.RenderTopFiles(root, *maxItems, 20))
+		fmt.Println(ui.RenderSummary(stats))
+		return
+	}
+	if *showTypes {
+		fmt.Print(ui.RenderExtensionStats(root, *maxItems, 20))
+		fmt.Println(ui.RenderSummary(stats))
+		return
+	}
 	treeOutput := ui.RenderCLITreeWithLimit(root, *maxDepth, 20, *maxItems)
 	fmt.Print(treeOutput)
 	fmt.Println(ui.RenderSummary(stats))
