@@ -16,70 +16,138 @@ type dirTask struct {
 	node *model.Node
 }
 
+// workQueue is a ring-buffer task queue with batch push support to minimize
+// lock contention and avoid backing-array memory leaks.
 type workQueue struct {
 	mu       sync.Mutex
 	cond     *sync.Cond
 	tasks    []dirTask
+	head     int
+	tail     int
+	count    int
 	inFlight int64
 	closed   bool
 }
 
 func newWorkQueue() *workQueue {
 	q := &workQueue{
-		tasks: make([]dirTask, 0, 1024),
+		tasks: make([]dirTask, 1024),
 	}
 	q.cond = sync.NewCond(&q.mu)
 	return q
 }
 
+func (q *workQueue) growLocked(needed int) {
+	newCap := len(q.tasks) * 2
+	for newCap < q.count+needed {
+		newCap *= 2
+	}
+	newTasks := make([]dirTask, newCap)
+	if q.head < q.tail {
+		copy(newTasks, q.tasks[q.head:q.tail])
+	} else if q.count > 0 {
+		n := copy(newTasks, q.tasks[q.head:])
+		copy(newTasks[n:], q.tasks[:q.tail])
+	}
+	q.tasks = newTasks
+	q.head = 0
+	q.tail = q.count
+}
+
 func (q *workQueue) Push(task dirTask) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 	if q.closed {
+		q.mu.Unlock()
 		return
 	}
-	q.tasks = append(q.tasks, task)
+	if q.count == len(q.tasks) {
+		q.growLocked(1)
+	}
+	q.tasks[q.tail] = task
+	q.tail = (q.tail + 1) % len(q.tasks)
+	q.count++
 	q.inFlight++
 	q.cond.Signal()
+	q.mu.Unlock()
+}
+
+func (q *workQueue) PushBatch(batch []dirTask) {
+	if len(batch) == 0 {
+		return
+	}
+	q.mu.Lock()
+	if q.closed {
+		q.mu.Unlock()
+		return
+	}
+	if q.count+len(batch) > len(q.tasks) {
+		q.growLocked(len(batch))
+	}
+	for _, task := range batch {
+		q.tasks[q.tail] = task
+		q.tail = (q.tail + 1) % len(q.tasks)
+	}
+	q.count += len(batch)
+	q.inFlight += int64(len(batch))
+	if len(batch) == 1 {
+		q.cond.Signal()
+	} else {
+		q.cond.Broadcast()
+	}
+	q.mu.Unlock()
 }
 
 func (q *workQueue) Pop() (dirTask, bool) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	for len(q.tasks) == 0 && !q.closed {
+	for q.count == 0 && !q.closed {
 		if q.inFlight == 0 {
 			q.closed = true
 			q.cond.Broadcast()
+			q.mu.Unlock()
 			return dirTask{}, false
 		}
 		q.cond.Wait()
 	}
 
-	if q.closed && len(q.tasks) == 0 {
+	if q.closed && q.count == 0 {
+		q.mu.Unlock()
 		return dirTask{}, false
 	}
 
-	task := q.tasks[0]
-	q.tasks = q.tasks[1:]
+	task := q.tasks[q.head]
+	q.tasks[q.head] = dirTask{} // clear pointer for GC
+	q.head = (q.head + 1) % len(q.tasks)
+	q.count--
+	q.mu.Unlock()
 	return task, true
 }
 
 func (q *workQueue) TaskDone() {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 	q.inFlight--
-	if q.inFlight == 0 && len(q.tasks) == 0 {
+	if q.inFlight == 0 && q.count == 0 {
 		q.closed = true
 		q.cond.Broadcast()
 	}
+	q.mu.Unlock()
 }
 
 func (q *workQueue) Close() {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 	q.closed = true
 	q.cond.Broadcast()
+	q.mu.Unlock()
+}
+
+func joinPath(dir, name string) string {
+	if len(dir) == 0 {
+		return name
+	}
+	last := dir[len(dir)-1]
+	if last == os.PathSeparator || last == '/' {
+		return dir + name
+	}
+	return dir + string(os.PathSeparator) + name
 }
 
 func (s *Scanner) Scan(ctx context.Context, rootPath string) (*model.Node, *model.ScanStats, error) {
@@ -95,10 +163,9 @@ func (s *Scanner) Scan(ctx context.Context, rootPath string) (*model.Node, *mode
 
 	startTime := time.Now()
 	rootNode := &model.Node{
-		Name:    filepath.Base(absRoot),
-		Path:    absRoot,
-		Type:    model.NodeTypeDir,
-		ModTime: rootInfo.ModTime(),
+		Name: filepath.Base(absRoot),
+		Path: absRoot,
+		Type: model.NodeTypeDir,
 	}
 
 	if !rootInfo.IsDir() {
@@ -114,21 +181,21 @@ func (s *Scanner) Scan(ctx context.Context, rootPath string) (*model.Node, *mode
 	}
 
 	visited := &VisitedMap{}
-	visited.MarkIfNew(absRoot)
+	visited.MarkRoot(rootInfo)
 
 	queue := newWorkQueue()
 	var totalFiles atomic.Int64
 	var totalDirs atomic.Int64
 	var totalErrors atomic.Int64
 
-	// IMPORTANT: Push the initial task BEFORE starting workers so that inFlight > 0
+	// Push the initial task BEFORE starting workers so that inFlight > 0.
 	queue.Push(dirTask{path: absRoot, node: rootNode})
 
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Context watcher to unblock queue on cancellation
+	// Context watcher to unblock queue on cancellation.
 	go func() {
 		<-ctx.Done()
 		queue.Close()
@@ -138,11 +205,10 @@ func (s *Scanner) Scan(ctx context.Context, rootPath string) (*model.Node, *mode
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			var subDirs []dirTask
 			for {
-				select {
-				case <-ctx.Done():
+				if ctx.Err() != nil {
 					return
-				default:
 				}
 
 				task, ok := queue.Pop()
@@ -150,7 +216,11 @@ func (s *Scanner) Scan(ctx context.Context, rootPath string) (*model.Node, *mode
 					return
 				}
 
-				s.processDir(ctx, task, queue, visited, &totalFiles, &totalDirs, &totalErrors)
+				subDirs = subDirs[:0]
+				subDirs = s.processDir(ctx, task, subDirs, visited, &totalFiles, &totalDirs, &totalErrors)
+				if len(subDirs) > 0 {
+					queue.PushBatch(subDirs)
+				}
 				queue.TaskDone()
 			}
 		}()
@@ -174,69 +244,75 @@ func (s *Scanner) Scan(ctx context.Context, rootPath string) (*model.Node, *mode
 func (s *Scanner) processDir(
 	ctx context.Context,
 	task dirTask,
-	queue *workQueue,
+	subDirs []dirTask,
 	visited *VisitedMap,
 	totalFiles *atomic.Int64,
 	totalDirs *atomic.Int64,
 	totalErrors *atomic.Int64,
-) {
+) []dirTask {
+	if ctx.Err() != nil {
+		return subDirs
+	}
+
 	entries, err := os.ReadDir(task.path)
 	if err != nil {
 		totalErrors.Add(1)
-		return
+		return subDirs
 	}
 
 	totalDirs.Add(1)
 
+	var localFiles int64
+	var localErrors int64
+	children := make([]*model.Node, 0, len(entries))
+
 	for _, entry := range entries {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		childPath := filepath.Join(task.path, entry.Name())
-
 		if IsSymlink(entry) {
 			continue
 		}
 
+		name := entry.Name()
 		if entry.IsDir() {
-			if !visited.MarkIfNew(childPath) {
+			if !visited.MarkDirEntry(entry) {
 				continue
 			}
 
 			childNode := &model.Node{
-				Name:   entry.Name(),
-				Path:   childPath,
+				Name:   name,
 				Type:   model.NodeTypeDir,
 				Parent: task.node,
 			}
-			task.node.AddChild(childNode)
-
-			queue.Push(dirTask{path: childPath, node: childNode})
+			children = append(children, childNode)
+			subDirs = append(subDirs, dirTask{
+				path: joinPath(task.path, name),
+				node: childNode,
+			})
 		} else {
 			info, err := entry.Info()
 			var size int64
-			var modTime time.Time
 			if err != nil {
-				totalErrors.Add(1)
+				localErrors++
 			} else {
 				size = info.Size()
-				modTime = info.ModTime()
 			}
 
-			childNode := &model.Node{
-				Name:      entry.Name(),
-				Path:      childPath,
+			children = append(children, &model.Node{
+				Name:      name,
 				Size:      size,
 				Type:      model.NodeTypeFile,
-				ModTime:   modTime,
 				ItemCount: 1,
 				Parent:    task.node,
-			}
-			task.node.AddChild(childNode)
-			totalFiles.Add(1)
+			})
+			localFiles++
 		}
 	}
+
+	task.node.Children = children
+	if localFiles > 0 {
+		totalFiles.Add(localFiles)
+	}
+	if localErrors > 0 {
+		totalErrors.Add(localErrors)
+	}
+	return subDirs
 }

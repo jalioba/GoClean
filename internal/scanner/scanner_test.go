@@ -89,3 +89,29 @@ func TestScannerContextCancel(t *testing.T) {
 		t.Fatalf("unexpected error on empty dir with timeout: %v", err)
 	}
 }
+
+func BenchmarkScan(b *testing.B) {
+	tempDir := b.TempDir()
+	// Create a realistic directory tree: 50 dirs x 20 files = 1,000 files
+	for d := 0; d < 50; d++ {
+		dir := filepath.Join(tempDir, fmt.Sprintf("pkg_%d", d), "sub")
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			b.Fatal(err)
+		}
+		for f := 0; f < 20; f++ {
+			if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("file_%d.txt", f)), []byte("hello"), 0644); err != nil {
+				b.Fatal(err)
+			}
+		}
+	}
+
+	sc := New(Options{})
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _, err := sc.Scan(context.Background(), tempDir)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}

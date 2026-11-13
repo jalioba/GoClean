@@ -1,9 +1,9 @@
 package model
 
 import (
+	"os"
 	"sort"
-	"sync"
-	"time"
+	"strings"
 )
 
 type NodeType uint8
@@ -22,25 +22,101 @@ const (
 	SortByItems
 )
 
+// Node represents a file or directory in the scanned tree.
+// Path is only stored on the root node; all descendants compute their path via FullPath()
+// to minimize memory footprint and GC pressure on large directory trees.
 type Node struct {
 	Name      string
 	Path      string
 	Size      int64
 	ItemCount int64
 	Type      NodeType
-	ModTime   time.Time
 	IsCache   bool
 	CacheKind string
 	Parent    *Node `json:"-"`
 	Children  []*Node
-	mu        sync.Mutex
+}
+
+// FullPath reconstructs the full filesystem path of the node by walking up Parent pointers.
+func (n *Node) FullPath() string {
+	if n == nil {
+		return ""
+	}
+	if n.Path != "" {
+		return n.Path
+	}
+
+	// Collect path segments from n up to the ancestor that has Path set (or root).
+	var segments []string
+	curr := n
+	for curr != nil && curr.Path == "" {
+		segments = append(segments, curr.Name)
+		curr = curr.Parent
+	}
+
+	var base string
+	if curr != nil {
+		base = curr.Path
+	}
+
+	var sb strings.Builder
+	totalLen := len(base)
+	for _, s := range segments {
+		totalLen += 1 + len(s)
+	}
+	sb.Grow(totalLen)
+
+	if base != "" {
+		sb.WriteString(base)
+	}
+	for i := len(segments) - 1; i >= 0; i-- {
+		if sb.Len() > 0 {
+			last := sb.String()[sb.Len()-1]
+			if last != os.PathSeparator && last != '/' {
+				sb.WriteByte(os.PathSeparator)
+			}
+		}
+		sb.WriteString(segments[i])
+	}
+	return sb.String()
 }
 
 func (n *Node) AddChild(child *Node) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
 	child.Parent = n
 	n.Children = append(n.Children, child)
+}
+
+// RemoveChild detaches target from n.Children and subtracts its size and item count
+// from n and all ancestors in O(depth) time.
+func (n *Node) RemoveChild(target *Node) bool {
+	idx := -1
+	for i, c := range n.Children {
+		if c == target {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return false
+	}
+
+	n.Children = append(n.Children[:idx], n.Children[idx+1:]...)
+
+	removedItems := target.ItemCount
+	if target.Type == NodeTypeDir {
+		removedItems++
+	}
+	for curr := n; curr != nil; curr = curr.Parent {
+		curr.Size -= target.Size
+		if curr.Size < 0 {
+			curr.Size = 0
+		}
+		curr.ItemCount -= removedItems
+		if curr.ItemCount < 0 {
+			curr.ItemCount = 0
+		}
+	}
+	return true
 }
 
 func (n *Node) PostOrderAggregate() {
@@ -65,9 +141,25 @@ func (n *Node) PostOrderAggregate() {
 }
 
 func (n *Node) SortChildren(criteria SortCriteria) {
-	for _, child := range n.Children {
-		if child.Type == NodeTypeDir {
-			child.SortChildren(criteria)
+	n.SortChildrenDepth(criteria, -1)
+}
+
+// SortChildrenDepth sorts children up to maxDepth levels (maxDepth < 0 means unlimited).
+func (n *Node) SortChildrenDepth(criteria SortCriteria, maxDepth int) {
+	if maxDepth == 0 || len(n.Children) == 0 {
+		return
+	}
+
+	nextDepth := maxDepth - 1
+	if maxDepth < 0 {
+		nextDepth = -1
+	}
+
+	if nextDepth != 0 {
+		for _, child := range n.Children {
+			if child.Type == NodeTypeDir {
+				child.SortChildrenDepth(criteria, nextDepth)
+			}
 		}
 	}
 

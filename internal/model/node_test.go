@@ -34,3 +34,26 @@ func TestPostOrderAggregateAndSort(t *testing.T) {
 		t.Fatalf("expected largest child dirA first, got %s", root.Children[0].Name)
 	}
 }
+
+func TestFullPathAndRemoveChild(t *testing.T) {
+	root := &Node{Name: "root", Path: "/tmp/root", Type: NodeTypeDir}
+	dirA := &Node{Name: "dirA", Type: NodeTypeDir}
+	fileA1 := &Node{Name: "fileA1.txt", Type: NodeTypeFile, Size: 500, ItemCount: 1}
+	dirA.AddChild(fileA1)
+	root.AddChild(dirA)
+	root.PostOrderAggregate()
+
+	if got := fileA1.FullPath(); got != "/tmp/root/dirA/fileA1.txt" {
+		t.Fatalf("unexpected FullPath: %s", got)
+	}
+
+	if !dirA.RemoveChild(fileA1) {
+		t.Fatal("expected RemoveChild to return true")
+	}
+	if root.Size != 0 || dirA.Size != 0 {
+		t.Fatalf("expected sizes to be 0 after removal, got root=%d dirA=%d", root.Size, dirA.Size)
+	}
+	if root.ItemCount != 1 || dirA.ItemCount != 0 {
+		t.Fatalf("expected root items=1 dirA items=0, got root=%d dirA=%d", root.ItemCount, dirA.ItemCount)
+	}
+}

@@ -21,3 +21,7 @@ func New(opts Options) *Scanner {
 		workers: w,
 	}
 }
+
+func (s *Scanner) Workers() int {
+	return s.workers
+}
