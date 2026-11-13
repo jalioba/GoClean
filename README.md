@@ -20,13 +20,14 @@ It scales filesystem metadata traversal across all CPU cores using a low-content
   * Direct badge highlights for trash/cache targets: `[CACHE: npm/node]`, `[CACHE: rust/cargo]`, etc.
 * **Full-Screen Interactive TUI (`-i`)**:
   * Powered by `charmbracelet/bubbletea` and `lipgloss`.
-  * Smooth navigation (`↑`/`↓`/`Enter`/`Esc` or `j`/`k`/`l`/`h`) with parent cursor position memory when going back.
-  * Instant lazy sorting of the active directory by size, name, or item count (`s`).
-  * Live UTF-8 filter/search by filename (`/`).
-  * Non-blocking asynchronous deletion (`d`) and batch cache cleaning (`c`) with centered confirmation modals and a **mini-tree preview** of the files and folders to be removed.
-* **Smart & Safe Cache Cleaner**:
-  * **Unambiguous cache rules**: Node.js (`node_modules`, `.next`, `.nuxt`, `.turbo`, `.pnpm-store`), Python (`__pycache__`, `.pytest_cache`, `.mypy_cache`, `.venv`, `venv`), Java/Kotlin (`.gradle`), general (`.cache`, `.ds_store`, `thumbs.db`).
-  * **Context-aware rules**: Rust `target` (matched only next to `Cargo.toml`), Maven `target` (next to `pom.xml`), .NET `bin`/`obj` (next to `.csproj`/`.fsproj`/`.vbproj`) — avoiding accidental deletion of generic `build`, `dist`, or `bin` folders.
+  * Smooth navigation (`↑`/`↓`/`PgUp`/`PgDn`/`Home`/`End`/`Enter`/`Esc` or `j`/`k`/`g`/`G`/`l`/`h`) with parent cursor position memory when going back.
+  * **Multi-Select (`Space`)**: mark multiple files or folders `[✓]` with live total size counter and delete them in a single batch (`d`).
+  * **Interactive Cache Picker (`c`)**: toggle `[✓]` / `[ ]` checkboxes on individual detected caches (`Space` or `a` for all/none) with a live mini-tree preview of the highlighted cache before cleaning.
+  * **Built-in Analytics Views**: press `f` for **Top Largest Files** or `t` for **File Extension Breakdown** right inside the TUI.
+  * Instant lazy sorting of the active directory by size, name, or item count (`s`) and live UTF-8 filter/search (`/`).
+* **Smart & Safe Cache Cleaner (25+ Ecosystems)**:
+  * **Unambiguous cache rules**: Node.js/Web (`node_modules`, `.next`, `.nuxt`, `.turbo`, `.pnpm-store`, `.vite`, `.parcel-cache`, `.angular`, `.svelte-kit`, `.astro`, `.nyc_output`), Python (`__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `.tox`, `.nox`, `.venv`, `venv`), JVM (`.gradle`), Dart/Flutter (`.dart_tool`), Infrastructure/Systems (`.terraform`, `.zig-cache`, `zig-cache`, `zig-out`, `CMakeFiles`, `DerivedData`), general (`.cache`, `.ds_store`, `thumbs.db`).
+  * **Context-aware rules**: Rust `target` (next to `Cargo.toml`), Maven `target` (next to `pom.xml`), Scala `target` (next to `build.sbt`), .NET `bin`/`obj` (next to `.csproj`/`.fsproj`/`.vbproj`), Flutter/Gradle/CMake `build` (next to `pubspec.yaml`, `build.gradle`, or `CMakeLists.txt`), and iOS `Pods` (next to `Podfile`).
   * Accurate size calculation without double-counting nested caches (e.g., `node_modules` inside `node_modules`).
   * Parallel multi-worker cache deletion for maximum cleanup speed.
   * Dry-run mode (`--dry-run`) and protected system/root path safeguards (`C:\`, `/`, `/usr`, `/bin`, `Windows`, `Program Files`, `$HOME`).
@@ -134,12 +135,16 @@ goclean -i C:\Users\user\Projects
 | Key | Action |
 |---|---|
 | `↑` / `k`, `↓` / `j` | Move cursor up / down |
+| `PgUp` / `PgDn`, `Home` (`g`) / `End` (`G`) | Fast page scroll / jump to start or end |
+| `Space` | Toggle `[✓]` selection on file/directory (or cache in `c` modal) |
 | `Enter` / `→` / `l` | Enter selected directory |
-| `Esc` / `←` / `h` | Go up to parent directory (restores cursor position) |
+| `Esc` / `←` / `h` | Go up to parent directory (restores cursor position) or exit view |
 | `s` | Cycle sort criteria (by size / by name / by items count) |
+| `f` | Toggle **Top Largest Files** view |
+| `t` | Toggle **File Extension Breakdown** view |
 | `/` | Live filter / search by name |
-| `c` | Open dialog with mini-tree preview to clean all detected caches in current folder |
-| `d` | Open dialog with mini-tree preview to delete selected directory or file |
+| `c` | Open interactive cache cleaner (`[✓]`/`[ ]` checkboxes + mini-tree preview) |
+| `d` | Delete selected item(s) with mini-tree preview |
 | `q` / `Ctrl+C` | Exit |
 
 ### 3. Cleaning Caches via CLI
@@ -183,6 +188,8 @@ goclean --clean-cache -y
 | `-w <int>` | Number of concurrent scanner workers | `NumCPU * 2` |
 | `-d <int>` | Maximum directory tree display depth | `2` |
 | `-n <int>` | Maximum items to display per directory in CLI tree (`0` = all) | `15` |
+| `--top-files` | Display top largest individual files across the scanned tree | `false` |
+| `--types` | Display disk usage grouped by file extension | `false` |
 | `--clean-cache` | Scan for and remove project caches (`node_modules`, `target`, etc.) | `false` |
 | `--dry-run` | Simulate deletion without removing files from disk | `false` |
 | `-y` | Automatically confirm deletion prompts | `false` |

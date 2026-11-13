@@ -4,7 +4,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const REPO = 'jalioba/GoClean';
-const VERSION = '1.0.0'; // Updated automatically during release
+const VERSION = '2.0.0'; // Updated automatically during release
 
 function getPlatformInfo() {
   const platform = process.platform;

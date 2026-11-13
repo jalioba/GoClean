@@ -1,6 +1,6 @@
 {
   "name": "@jalioba/goclean",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Blazing-fast concurrent disk space analyzer and developer cache cleaner",
   "main": "bin/goclean.js",
   "bin": {
