@@ -31,6 +31,7 @@ var (
 
 	tableHeaderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 	statusMsgStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD600"))
+	selectedBadge    = lipgloss.NewStyle().Foreground(lipgloss.Color("#00E676")).Bold(true)
 )
 
 func truncateRunes(s string, max int) string {
@@ -51,21 +52,75 @@ func (m Model) View() string {
 
 	var sb strings.Builder
 
-	header := fmt.Sprintf(" GoClean v1.0 ─ Directory: %s ", m.Current.FullPath())
+	modeLabel := "Browser"
+	switch m.Mode {
+	case ViewTopFiles:
+		modeLabel = "Top Largest Files"
+	case ViewFileTypes:
+		modeLabel = "File Types"
+	}
+
+	header := fmt.Sprintf(" GoClean v2.0 [%s] ─ %s (%s) ",
+		modeLabel,
+		m.Current.FullPath(),
+		ui.FormatBytes(m.Current.Size),
+	)
 	sb.WriteString(headerBoxStyle.Width(m.Width).Render(header))
 	sb.WriteString("\n")
 
-	tableHeader := fmt.Sprintf("  %-30s  %10s  %-15s  %6s  %s",
-		"Name", "Size", "% Usage", "Items", "Badge")
-	sb.WriteString(tableHeaderStyle.Render(tableHeader))
-	sb.WriteString("\n")
-
-	items := m.filteredChildren()
 	maxRows := m.Height - 6
 	if maxRows < 5 {
 		maxRows = 10
 	}
 
+	switch m.Mode {
+	case ViewTopFiles:
+		m.renderTopFilesView(&sb, maxRows)
+	case ViewFileTypes:
+		m.renderFileTypesView(&sb, maxRows)
+	default:
+		m.renderTreeView(&sb, maxRows)
+	}
+
+	// Selected items indicator + Status bar
+	selNodes, selBytes := m.SelectedNodes()
+	if len(selNodes) > 0 {
+		selInfo := fmt.Sprintf("📌 Selected: %d items (%s) — press [d] to delete selected", len(selNodes), ui.FormatBytes(selBytes))
+		sb.WriteString(selectedBadge.Render(selInfo))
+		sb.WriteString("\n")
+	} else if m.StatusMsg != "" {
+		sb.WriteString(statusMsgStyle.Render("⚡ " + m.StatusMsg))
+		sb.WriteString("\n")
+	}
+
+	help := "[↑/↓] Move | [Space] Select | [Enter/→] Open | [Esc/←] Back | [s] Sort | [f] Top Files | [t] Types | [c] Caches | [d] Delete | [q] Quit"
+	if m.Filtering {
+		help = fmt.Sprintf("🔍 Search: %s_ [Esc to finish]", m.Filter)
+	}
+	sb.WriteString(footerBoxStyle.Width(m.Width).Render(help))
+
+	if m.Dialog == DialogDeleteTarget {
+		targets := m.currentTargetsForDelete()
+		if len(targets) > 0 {
+			dialog := renderDeleteDialog(targets)
+			return lipgloss.Place(m.Width, m.Height, lipgloss.Center, lipgloss.Center, dialog)
+		}
+	}
+	if m.Dialog == DialogCleanAllCaches {
+		dialog := renderCleanCachesDialog(m.Current, m.TargetCaches, m.CacheChecked, m.CacheCursor)
+		return lipgloss.Place(m.Width, m.Height, lipgloss.Center, lipgloss.Center, dialog)
+	}
+
+	return sb.String()
+}
+
+func (m Model) renderTreeView(sb *strings.Builder, maxRows int) {
+	tableHeader := fmt.Sprintf("      %-28s  %10s  %-15s  %6s  %s",
+		"Name", "Size", "% Usage", "Items", "Badge")
+	sb.WriteString(tableHeaderStyle.Render(tableHeader))
+	sb.WriteString("\n")
+
+	items := m.filteredChildren()
 	start := 0
 	if m.Cursor >= maxRows {
 		start = m.Cursor - maxRows + 1
@@ -80,6 +135,8 @@ func (m Model) View() string {
 		parentSize = 1
 	}
 
+	hasAnySelected := len(m.Selected) > 0
+
 	for i := start; i < end; i++ {
 		item := items[i]
 		ratio := float64(item.Size) / float64(parentSize)
@@ -91,6 +148,13 @@ func (m Model) View() string {
 			icon = "📄 "
 		}
 
+		mark := "    "
+		if m.Selected[item] {
+			mark = "[✓] "
+		} else if hasAnySelected {
+			mark = "[ ] "
+		}
+
 		name := truncateRunes(item.Name, 28)
 
 		tag := ""
@@ -98,7 +162,8 @@ func (m Model) View() string {
 			tag = fmt.Sprintf("[CACHE: %s]", item.CacheKind)
 		}
 
-		row := fmt.Sprintf(" %s%-28s  %10s  [%s] %s  %6s  %s",
+		row := fmt.Sprintf(" %s%s%-28s  %10s  [%s] %s  %6s  %s",
+			mark,
 			icon,
 			name,
 			ui.FormatBytes(item.Size),
@@ -115,27 +180,110 @@ func (m Model) View() string {
 		}
 		sb.WriteString("\n")
 	}
+}
 
-	// Status / Helper bar
-	if m.StatusMsg != "" {
-		sb.WriteString(statusMsgStyle.Render("⚡ " + m.StatusMsg))
+func (m Model) renderTopFilesView(sb *strings.Builder, maxRows int) {
+	tableHeader := fmt.Sprintf("      %-38s  %10s  %-15s",
+		"Relative File Path", "Size", "% Usage")
+	sb.WriteString(tableHeaderStyle.Render(tableHeader))
+	sb.WriteString("\n")
+
+	items := m.TopFilesList
+	start := 0
+	if m.Cursor >= maxRows {
+		start = m.Cursor - maxRows + 1
+	}
+	end := start + maxRows
+	if end > len(items) {
+		end = len(items)
+	}
+
+	parentSize := m.Current.Size
+	if parentSize == 0 {
+		parentSize = 1
+	}
+	basePath := m.Current.FullPath()
+	hasAnySelected := len(m.Selected) > 0
+
+	for i := start; i < end; i++ {
+		item := items[i]
+		ratio := float64(item.Size) / float64(parentSize)
+		bar := ui.RenderBar(ratio, 12, true)
+		pct := ui.FormatPercent(ratio)
+
+		mark := "    "
+		if m.Selected[item] {
+			mark = "[✓] "
+		} else if hasAnySelected {
+			mark = "[ ] "
+		}
+
+		displayPath := item.FullPath()
+		if basePath != "" && strings.HasPrefix(displayPath, basePath) && displayPath != basePath {
+			rel := strings.TrimPrefix(displayPath, basePath)
+			rel = strings.TrimLeft(rel, "/\\")
+			if rel != "" {
+				displayPath = rel
+			}
+		}
+
+		row := fmt.Sprintf(" %s📄 %-38s  %10s  [%s] %s",
+			mark,
+			truncateRunes(displayPath, 38),
+			ui.FormatBytes(item.Size),
+			bar,
+			pct,
+		)
+
+		if i == m.Cursor {
+			sb.WriteString(selectedRowStyle.Width(m.Width).Render("> " + row))
+		} else {
+			sb.WriteString(normalRowStyle.Width(m.Width).Render("  " + row))
+		}
 		sb.WriteString("\n")
 	}
+}
 
-	help := "[↑/↓/j/k] Navigate | [Enter/→] Open | [Esc/←] Back | [s] Sort | [c] Clean Caches | [d] Delete | [q] Quit"
-	if m.Filtering {
-		help = fmt.Sprintf("🔍 Search: %s_ [Esc to cancel]", m.Filter)
-	}
-	sb.WriteString(footerBoxStyle.Width(m.Width).Render(help))
+func (m Model) renderFileTypesView(sb *strings.Builder, maxRows int) {
+	tableHeader := fmt.Sprintf("  %-18s  %12s  %-18s  %10s",
+		"Extension", "Total Size", "% Usage", "Files")
+	sb.WriteString(tableHeaderStyle.Render(tableHeader))
+	sb.WriteString("\n")
 
-	if m.Dialog == DialogDeleteTarget && len(items) > 0 && m.Cursor < len(items) {
-		dialog := renderDeleteDialog(items[m.Cursor])
-		return lipgloss.Place(m.Width, m.Height, lipgloss.Center, lipgloss.Center, dialog)
+	items := m.ExtStatsList
+	start := 0
+	if m.Cursor >= maxRows {
+		start = m.Cursor - maxRows + 1
 	}
-	if m.Dialog == DialogCleanAllCaches {
-		dialog := renderCleanCachesDialog(m.Current, m.TargetCaches, m.CacheBytes)
-		return lipgloss.Place(m.Width, m.Height, lipgloss.Center, lipgloss.Center, dialog)
+	end := start + maxRows
+	if end > len(items) {
+		end = len(items)
 	}
 
-	return sb.String()
+	parentSize := m.Current.Size
+	if parentSize == 0 {
+		parentSize = 1
+	}
+
+	for i := start; i < end; i++ {
+		st := items[i]
+		ratio := float64(st.Size) / float64(parentSize)
+		bar := ui.RenderBar(ratio, 12, true)
+		pct := ui.FormatPercent(ratio)
+
+		row := fmt.Sprintf("  %-18s  %12s  [%s] %s  %10s",
+			truncateRunes(st.Ext, 18),
+			ui.FormatBytes(st.Size),
+			bar,
+			pct,
+			ui.FormatNumber(st.Count),
+		)
+
+		if i == m.Cursor {
+			sb.WriteString(selectedRowStyle.Width(m.Width).Render("> " + row))
+		} else {
+			sb.WriteString(normalRowStyle.Width(m.Width).Render("  " + row))
+		}
+		sb.WriteString("\n")
+	}
 }
