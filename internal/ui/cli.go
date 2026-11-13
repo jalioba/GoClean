@@ -10,11 +10,6 @@ import (
 )
 
 var (
-	titleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#00FFFF")).
-			MarginBottom(1)
-
 	headerStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#EEEEEE")).
@@ -31,6 +26,10 @@ var (
 )
 
 func RenderCLITree(root *model.Node, maxDepth int, barWidth int) string {
+	return RenderCLITreeWithLimit(root, maxDepth, barWidth, 0)
+}
+
+func RenderCLITreeWithLimit(root *model.Node, maxDepth int, barWidth int, maxItems int) string {
 	if barWidth <= 0 {
 		barWidth = 15
 	}
@@ -100,8 +99,43 @@ func RenderCLITree(root *model.Node, maxDepth int, barWidth int) string {
 					newPrefix = prefix + "│   "
 				}
 			}
-			for i, child := range n.Children {
-				printNode(child, depth+1, newPrefix, i == len(n.Children)-1)
+
+			children := n.Children
+			limit := len(children)
+			truncated := false
+			if maxItems > 0 && limit > maxItems {
+				limit = maxItems
+				truncated = true
+			}
+
+			for i := 0; i < limit; i++ {
+				childIsLast := !truncated && (i == limit-1)
+				printNode(children[i], depth+1, newPrefix, childIsLast)
+			}
+
+			if truncated {
+				var remSize int64
+				var remItems int64
+				for i := limit; i < len(children); i++ {
+					remSize += children[i].Size
+					remItems += children[i].ItemCount
+				}
+				remCount := len(children) - limit
+				remRatio := float64(0)
+				if root.Size > 0 {
+					remRatio = float64(remSize) / float64(root.Size)
+				}
+				remBar := RenderBar(remRatio, barWidth, false)
+				remLine := fmt.Sprintf("%-10s  [%s] %s  %6s  %s└── %s",
+					FormatBytes(remSize),
+					remBar,
+					FormatPercent(remRatio),
+					FormatNumber(remItems),
+					newPrefix,
+					dimStyle.Render(fmt.Sprintf("... and %d more items", remCount)),
+				)
+				sb.WriteString(remLine)
+				sb.WriteString("\n")
 			}
 		}
 	}

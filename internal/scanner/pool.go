@@ -4,12 +4,16 @@ import (
 	"runtime"
 )
 
+type ProgressFunc func(dirs, files, errors int64)
+
 type Options struct {
-	Workers int
+	Workers    int
+	OnProgress ProgressFunc
 }
 
 type Scanner struct {
-	workers int
+	workers    int
+	onProgress ProgressFunc
 }
 
 func New(opts Options) *Scanner {
@@ -18,7 +22,8 @@ func New(opts Options) *Scanner {
 		w = runtime.NumCPU() * 2
 	}
 	return &Scanner{
-		workers: w,
+		workers:    w,
+		onProgress: opts.OnProgress,
 	}
 }
 

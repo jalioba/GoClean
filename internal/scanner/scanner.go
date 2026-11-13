@@ -201,6 +201,28 @@ func (s *Scanner) Scan(ctx context.Context, rootPath string) (*model.Node, *mode
 		queue.Close()
 	}()
 
+	var stopProgress chan struct{}
+	var progressDone chan struct{}
+	if s.onProgress != nil {
+		stopProgress = make(chan struct{})
+		progressDone = make(chan struct{})
+		go func() {
+			defer close(progressDone)
+			ticker := time.NewTicker(80 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stopProgress:
+					return
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					s.onProgress(totalDirs.Load(), totalFiles.Load(), totalErrors.Load())
+				}
+			}
+		}()
+	}
+
 	for i := 0; i < s.workers; i++ {
 		wg.Add(1)
 		go func() {
@@ -227,6 +249,10 @@ func (s *Scanner) Scan(ctx context.Context, rootPath string) (*model.Node, *mode
 	}
 
 	wg.Wait()
+	if stopProgress != nil {
+		close(stopProgress)
+		<-progressDone
+	}
 
 	rootNode.PostOrderAggregate()
 

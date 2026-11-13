@@ -21,6 +21,7 @@ func main() {
 	interactive := flag.Bool("i", false, "Launch interactive TUI mode (like ncdu)")
 	workers := flag.Int("w", 0, "Number of concurrent workers (default: NumCPU * 2)")
 	maxDepth := flag.Int("d", 2, "Maximum directory tree display depth")
+	maxItems := flag.Int("n", 15, "Maximum items to display per directory in CLI tree (0 = all)")
 	cleanCache := flag.Bool("clean-cache", false, "Scan for and remove development caches (node_modules, target, etc.)")
 	dryRun := flag.Bool("dry-run", false, "Simulate deletion without removing files from disk")
 	yes := flag.Bool("y", false, "Automatic yes to confirmation prompts")
@@ -34,13 +35,23 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	spinIdx := 0
+
 	sc := scanner.New(scanner.Options{
 		Workers: *workers,
+		OnProgress: func(dirs, files, errs int64) {
+			frame := spinnerFrames[spinIdx%len(spinnerFrames)]
+			spinIdx++
+			fmt.Fprintf(os.Stderr, "\r\033[K%s Scanning %s... 📁 %s dirs | 📄 %s files",
+				frame, targetPath, ui.FormatNumber(dirs), ui.FormatNumber(files))
+		},
 	})
 
-	fmt.Printf("🔍 Scanning %s (workers: %d)...\n", targetPath, sc.Workers())
+	fmt.Fprintf(os.Stderr, "🔍 Scanning %s (workers: %d)...", targetPath, sc.Workers())
 
 	root, stats, err := sc.Scan(ctx, targetPath)
+	fmt.Fprintf(os.Stderr, "\r\033[K")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Scan error: %v\n", err)
 		os.Exit(1)
@@ -96,7 +107,7 @@ func main() {
 	}
 
 	// Default CLI output mode (dust style)
-	treeOutput := ui.RenderCLITree(root, *maxDepth, 20)
+	treeOutput := ui.RenderCLITreeWithLimit(root, *maxDepth, 20, *maxItems)
 	fmt.Print(treeOutput)
 	fmt.Println(ui.RenderSummary(stats))
 }
