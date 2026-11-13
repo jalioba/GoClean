@@ -102,18 +102,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			items := m.filteredChildren()
 			if len(items) > 0 && m.Cursor < len(items) {
 				selected := items[m.Cursor]
-				if selected.Type == model.NodeTypeDir && len(selected.Children) > 0 {
-					m.Current = selected
-					m.Cursor = 0
-					m.Filter = ""
+				if selected.Type == model.NodeTypeDir {
+					if len(selected.Children) == 0 {
+						m.StatusMsg = fmt.Sprintf("Directory %q is empty", selected.Name)
+					} else {
+						selected.SortChildrenDepth(m.Sort, 1)
+						m.Current = selected
+						m.Cursor = 0
+						m.Filter = ""
+						m.StatusMsg = ""
+					}
 				}
 			}
 
 		case "esc", "backspace", "left", "h":
 			if m.Current.Parent != nil {
-				m.Current = m.Current.Parent
-				m.Cursor = 0
+				prev := m.Current
+				parent := m.Current.Parent
+				parent.SortChildrenDepth(m.Sort, 1)
+				m.Current = parent
 				m.Filter = ""
+				m.Cursor = 0
+				for i, c := range parent.Children {
+					if c == prev {
+						m.Cursor = i
+						break
+					}
+				}
 			}
 
 		case "s":
@@ -128,7 +143,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Sort = model.SortBySize
 				m.StatusMsg = "Sort: by size"
 			}
-			m.Current.SortChildren(m.Sort)
+			m.Current.SortChildrenDepth(m.Sort, 1)
 
 		case "/":
 			m.Filtering = true
@@ -231,7 +246,8 @@ func (m *Model) removeNodeFromParent(target *model.Node) {
 	}
 	p := target.Parent
 	p.RemoveChild(target)
-	if m.Cursor >= len(p.Children) && m.Cursor > 0 {
-		m.Cursor--
+	items := m.filteredChildren()
+	if m.Cursor >= len(items) && m.Cursor > 0 {
+		m.Cursor = len(items) - 1
 	}
 }

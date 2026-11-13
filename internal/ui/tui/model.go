@@ -23,8 +23,18 @@ type Model struct {
 }
 
 func NewModel(root *model.Node) Model {
-	root.SortChildren(model.SortBySize)
-	cacheBytes, _ := cleaner.TagCaches(root)
+	if root != nil {
+		root.SortChildrenDepth(model.SortBySize, 1)
+	}
+	caches := cleaner.CollectCaches(root)
+	var cacheBytes int64
+	if len(caches) == 0 && root != nil {
+		cacheBytes, _ = cleaner.TagCaches(root)
+	} else {
+		for _, c := range caches {
+			cacheBytes += c.Size
+		}
+	}
 	return Model{
 		Root:       root,
 		Current:    root,

@@ -66,17 +66,18 @@ func (n *Node) FullPath() string {
 	}
 	sb.Grow(totalLen)
 
+	needSep := false
 	if base != "" {
 		sb.WriteString(base)
+		last := base[len(base)-1]
+		needSep = last != os.PathSeparator && last != '/'
 	}
 	for i := len(segments) - 1; i >= 0; i-- {
-		if sb.Len() > 0 {
-			last := sb.String()[sb.Len()-1]
-			if last != os.PathSeparator && last != '/' {
-				sb.WriteByte(os.PathSeparator)
-			}
+		if needSep {
+			sb.WriteByte(os.PathSeparator)
 		}
 		sb.WriteString(segments[i])
+		needSep = true
 	}
 	return sb.String()
 }
