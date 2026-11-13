@@ -175,7 +175,14 @@ goclean --clean-cache
 
 **Batch clean without prompt (useful for CI/scripts):**
 ```bash
-goclean --clean-cache -y
+# Unconditional single-flag cleanup of all detected caches:
+goclean --force-clean
+
+# Unconditional cleanup of specific cache types only (e.g., npm and Rust):
+goclean --force-clean --clean-kind npm,rust
+
+# Unconditional cleanup of specific file extensions (e.g., logs and temp files):
+goclean --force-clean --clean-ext .log,.tmp,.bak
 ```
 
 ---
@@ -191,6 +198,9 @@ goclean --clean-cache -y
 | `--top-files` | Display top largest individual files across the scanned tree | `false` |
 | `--types` | Display disk usage grouped by file extension | `false` |
 | `--clean-cache` | Scan for and remove project caches (`node_modules`, `target`, etc.) | `false` |
+| `--force-clean` | Unconditionally delete detected caches (or `--clean-ext` files) without prompt | `false` |
+| `--clean-kind <list>` | Comma-separated cache types or folder names to clean (`npm,rust,python`) | `""` |
+| `--clean-ext <list>` | Comma-separated file extensions to delete (`.log,.tmp,.bak`) | `""` |
 | `--dry-run` | Simulate deletion without removing files from disk | `false` |
 | `-y` | Automatically confirm deletion prompts | `false` |
 

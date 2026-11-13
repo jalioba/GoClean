@@ -1,6 +1,9 @@
 package cleaner
 
 import (
+	"path/filepath"
+	"strings"
+
 	"goclean/internal/model"
 )
 
@@ -60,4 +63,85 @@ func CollectCaches(root *model.Node) []*model.Node {
 	}
 	walk(root)
 	return caches
+}
+
+// FilterCachesByKind filters cache nodes by a comma-separated list of kinds or directory names
+// (e.g. "npm,rust,python" or "node_modules,target").
+func FilterCachesByKind(caches []*model.Node, filterCSV string) ([]*model.Node, int64) {
+	rawTokens := strings.Split(filterCSV, ",")
+	tokens := make([]string, 0, len(rawTokens))
+	for _, t := range rawTokens {
+		t = strings.ToLower(strings.TrimSpace(t))
+		if t != "" {
+			tokens = append(tokens, t)
+		}
+	}
+	if len(tokens) == 0 {
+		var total int64
+		for _, c := range caches {
+			total += c.Size
+		}
+		return caches, total
+	}
+
+	var filtered []*model.Node
+	var totalBytes int64
+	for _, c := range caches {
+		kindLower := strings.ToLower(c.CacheKind)
+		nameLower := strings.ToLower(c.Name)
+		matched := false
+		for _, tok := range tokens {
+			if kindLower == tok || strings.Contains(kindLower, tok) || nameLower == tok {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			filtered = append(filtered, c)
+			totalBytes += c.Size
+		}
+	}
+	return filtered, totalBytes
+}
+
+// CollectFilesByExt collects all files matching a comma-separated list of extensions
+// (e.g. ".log,.tmp,bak").
+func CollectFilesByExt(root *model.Node, extCSV string) ([]*model.Node, int64) {
+	if root == nil {
+		return nil, 0
+	}
+	rawExts := strings.Split(extCSV, ",")
+	extSet := make(map[string]struct{}, len(rawExts))
+	for _, e := range rawExts {
+		e = strings.ToLower(strings.TrimSpace(e))
+		if e == "" {
+			continue
+		}
+		if !strings.HasPrefix(e, ".") {
+			e = "." + e
+		}
+		extSet[e] = struct{}{}
+	}
+	if len(extSet) == 0 {
+		return nil, 0
+	}
+
+	var files []*model.Node
+	var totalBytes int64
+	var walk func(n *model.Node)
+	walk = func(n *model.Node) {
+		if n.Type == model.NodeTypeFile {
+			ext := strings.ToLower(filepath.Ext(n.Name))
+			if _, ok := extSet[ext]; ok {
+				files = append(files, n)
+				totalBytes += n.Size
+			}
+			return
+		}
+		for _, ch := range n.Children {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return files, totalBytes
 }

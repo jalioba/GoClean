@@ -69,6 +69,17 @@ func TestContextualCacheAndNoDoubleCount(t *testing.T) {
 	if cacheBytes != 2500 {
 		t.Fatalf("expected 2500 cache bytes, got %d", cacheBytes)
 	}
+
+	allCaches := CollectCaches(root)
+	rustOnly, rustBytes := FilterCachesByKind(allCaches, "rust")
+	if len(rustOnly) != 1 || rustOnly[0].Name != "target" || rustBytes != 2000 {
+		t.Fatalf("expected FilterCachesByKind('rust') to return target (2000B), got len=%d bytes=%d", len(rustOnly), rustBytes)
+	}
+
+	jsFiles, jsBytes := CollectFilesByExt(root, "js,.toml")
+	if len(jsFiles) != 2 || jsBytes != 600 {
+		t.Fatalf("expected CollectFilesByExt('js,.toml') to return 2 files (600B), got len=%d bytes=%d", len(jsFiles), jsBytes)
+	}
 }
 
 func NodeTypeDirFallback() model.NodeType {
