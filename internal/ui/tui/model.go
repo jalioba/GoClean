@@ -16,6 +16,7 @@ type Model struct {
 	Width        int
 	Height       int
 	Dialog       DialogKind
+	Deleting     bool
 	StatusMsg    string
 	TargetCaches []*model.Node
 	CacheBytes   int64

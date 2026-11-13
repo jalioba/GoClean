@@ -12,6 +12,11 @@ var (
 	colorYellow = lipgloss.Color("#FFD600")
 	colorOrange = lipgloss.Color("#FF9100")
 	colorRed    = lipgloss.Color("#FF5252")
+
+	barStyleRed    = lipgloss.NewStyle().Foreground(colorRed)
+	barStyleOrange = lipgloss.NewStyle().Foreground(colorOrange)
+	barStyleYellow = lipgloss.NewStyle().Foreground(colorYellow)
+	barStyleGreen  = lipgloss.NewStyle().Foreground(colorGreen)
 )
 
 func RenderBar(ratio float64, width int, colored bool) string {
@@ -47,19 +52,16 @@ func RenderBar(ratio float64, width int, colored bool) string {
 		return barStr
 	}
 
-	var style lipgloss.Style
 	switch {
 	case ratio >= 0.50:
-		style = lipgloss.NewStyle().Foreground(colorRed)
+		return barStyleRed.Render(barStr)
 	case ratio >= 0.25:
-		style = lipgloss.NewStyle().Foreground(colorOrange)
+		return barStyleOrange.Render(barStr)
 	case ratio >= 0.10:
-		style = lipgloss.NewStyle().Foreground(colorYellow)
+		return barStyleYellow.Render(barStr)
 	default:
-		style = lipgloss.NewStyle().Foreground(colorGreen)
+		return barStyleGreen.Render(barStr)
 	}
-
-	return style.Render(barStr)
 }
 
 func FormatPercent(ratio float64) string {

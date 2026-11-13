@@ -10,11 +10,68 @@ import (
 	"goclean/internal/ui"
 )
 
+type deleteDoneMsg struct {
+	deleted   []*model.Node
+	reclaimed int64
+	err       error
+	isBatch   bool
+}
+
+func deleteTargetCmd(target *model.Node) tea.Cmd {
+	return func() tea.Msg {
+		err := cleaner.DeleteSafely(target.FullPath(), false)
+		if err != nil {
+			return deleteDoneMsg{err: err}
+		}
+		return deleteDoneMsg{
+			deleted:   []*model.Node{target},
+			reclaimed: target.Size,
+		}
+	}
+}
+
+func cleanCachesCmd(caches []*model.Node) tea.Cmd {
+	return func() tea.Msg {
+		reclaimed, deleted, errs := cleaner.DeleteNodesParallel(caches, 0, false)
+		var firstErr error
+		if len(errs) > 0 {
+			firstErr = errs[0]
+		}
+		return deleteDoneMsg{
+			deleted:   deleted,
+			reclaimed: reclaimed,
+			err:       firstErr,
+			isBatch:   true,
+		}
+	}
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
+		return m, nil
+
+	case deleteDoneMsg:
+		m.Deleting = false
+		for _, node := range msg.deleted {
+			m.removeNodeFromParent(node)
+		}
+		if msg.isBatch {
+			if msg.err != nil {
+				m.StatusMsg = fmt.Sprintf("Cleaned %d caches (%s), with error: %v", len(msg.deleted), ui.FormatBytes(msg.reclaimed), msg.err)
+			} else {
+				m.StatusMsg = fmt.Sprintf("Cleaned %d caches, reclaimed %s", len(msg.deleted), ui.FormatBytes(msg.reclaimed))
+			}
+			m.TargetCaches = nil
+		} else {
+			if msg.err != nil {
+				m.StatusMsg = fmt.Sprintf("Delete error: %v", msg.err)
+			} else if len(msg.deleted) > 0 {
+				m.StatusMsg = fmt.Sprintf("Deleted: %s (%s)", msg.deleted[0].Name, ui.FormatBytes(msg.reclaimed))
+			}
+		}
 		return m, nil
 
 	case tea.KeyMsg:
@@ -78,12 +135,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Filter = ""
 
 		case "d":
+			if m.Deleting {
+				return m, nil
+			}
 			items := m.filteredChildren()
 			if len(items) > 0 && m.Cursor < len(items) {
 				m.Dialog = DialogDeleteTarget
 			}
 
 		case "c":
+			if m.Deleting {
+				return m, nil
+			}
 			caches := cleaner.CollectCaches(m.Current)
 			if len(caches) == 0 {
 				m.StatusMsg = "No caches found in current directory"
@@ -112,28 +175,19 @@ func (m Model) handleDialogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			items := m.filteredChildren()
 			if len(items) > 0 && m.Cursor < len(items) {
 				target := items[m.Cursor]
-				err := cleaner.DeleteSafely(target.Path, false)
-				if err != nil {
-					m.StatusMsg = fmt.Sprintf("Delete error: %v", err)
-				} else {
-					m.StatusMsg = fmt.Sprintf("Deleted: %s", target.Name)
-					m.removeNodeFromParent(target)
-				}
+				m.Dialog = DialogNone
+				m.Deleting = true
+				m.StatusMsg = fmt.Sprintf("Deleting %s...", target.Name)
+				return m, deleteTargetCmd(target)
 			}
 		} else if m.Dialog == DialogCleanAllCaches {
-			deletedCount := 0
-			var reclaimed int64
-			for _, c := range m.TargetCaches {
-				if err := cleaner.DeleteSafely(c.Path, false); err == nil {
-					deletedCount++
-					reclaimed += c.Size
-					m.removeNodeFromParent(c)
-				}
-			}
-			m.StatusMsg = fmt.Sprintf("Cleaned %d caches, reclaimed %s", deletedCount, ui.FormatBytes(reclaimed))
+			caches := m.TargetCaches
+			m.Dialog = DialogNone
+			m.Deleting = true
+			m.StatusMsg = fmt.Sprintf("Cleaning %d cache directories...", len(caches))
+			return m, cleanCachesCmd(caches)
 		}
 		m.Dialog = DialogNone
-		m.Root.PostOrderAggregate()
 		return m, nil
 	}
 	return m, nil
@@ -145,11 +199,12 @@ func (m Model) handleFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Filtering = false
 	case "backspace":
 		if len(m.Filter) > 0 {
-			m.Filter = m.Filter[:len(m.Filter)-1]
+			runes := []rune(m.Filter)
+			m.Filter = string(runes[:len(runes)-1])
 		}
 	default:
-		if len(msg.String()) == 1 {
-			m.Filter += msg.String()
+		if len(msg.Runes) > 0 {
+			m.Filter += string(msg.Runes)
 			m.Cursor = 0
 		}
 	}
@@ -160,9 +215,10 @@ func (m Model) filteredChildren() []*model.Node {
 	if m.Filter == "" {
 		return m.Current.Children
 	}
-	var res []*model.Node
+	lowerFilter := strings.ToLower(m.Filter)
+	res := make([]*model.Node, 0, len(m.Current.Children))
 	for _, child := range m.Current.Children {
-		if strings.Contains(strings.ToLower(child.Name), strings.ToLower(m.Filter)) {
+		if strings.Contains(strings.ToLower(child.Name), lowerFilter) {
 			res = append(res, child)
 		}
 	}
@@ -174,12 +230,7 @@ func (m *Model) removeNodeFromParent(target *model.Node) {
 		return
 	}
 	p := target.Parent
-	for i, c := range p.Children {
-		if c == target {
-			p.Children = append(p.Children[:i], p.Children[i+1:]...)
-			break
-		}
-	}
+	p.RemoveChild(target)
 	if m.Cursor >= len(p.Children) && m.Cursor > 0 {
 		m.Cursor--
 	}

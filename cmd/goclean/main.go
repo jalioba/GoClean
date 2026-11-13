@@ -34,11 +34,11 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	fmt.Printf("🔍 Scanning %s (workers: %d)...\n", targetPath, *workers)
-
 	sc := scanner.New(scanner.Options{
 		Workers: *workers,
 	})
+
+	fmt.Printf("🔍 Scanning %s (workers: %d)...\n", targetPath, sc.Workers())
 
 	root, stats, err := sc.Scan(ctx, targetPath)
 	if err != nil {
@@ -68,7 +68,7 @@ func main() {
 
 		fmt.Printf("\n🧹 Found %d cache directories totaling %s:\n", len(caches), ui.FormatBytes(cacheBytes))
 		for _, c := range caches {
-			fmt.Printf("  • %-30s [%s] (%s, %s items)\n", c.Path, c.CacheKind, ui.FormatBytes(c.Size), ui.FormatNumber(c.ItemCount))
+			fmt.Printf("  • %-30s [%s] (%s, %s items)\n", c.FullPath(), c.CacheKind, ui.FormatBytes(c.Size), ui.FormatNumber(c.ItemCount))
 		}
 
 		if *dryRun {
@@ -87,13 +87,9 @@ func main() {
 			}
 		}
 
-		var reclaimed int64
-		for _, c := range caches {
-			if err := cleaner.DeleteSafely(c.Path, false); err != nil {
-				fmt.Fprintf(os.Stderr, "Delete error for %s: %v\n", c.Path, err)
-			} else {
-				reclaimed += c.Size
-			}
+		reclaimed, _, errs := cleaner.DeleteNodesParallel(caches, sc.Workers(), false)
+		for _, delErr := range errs {
+			fmt.Fprintf(os.Stderr, "Delete error: %v\n", delErr)
 		}
 		fmt.Printf("✅ Successfully reclaimed: %s!\n", ui.FormatBytes(reclaimed))
 		return

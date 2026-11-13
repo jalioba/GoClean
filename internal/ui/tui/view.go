@@ -28,7 +28,21 @@ var (
 			Foreground(lipgloss.Color("#888888")).
 			Background(lipgloss.Color("#111111")).
 			Padding(0, 1)
+
+	tableHeaderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	statusMsgStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD600"))
 )
+
+func truncateRunes(s string, max int) string {
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	if max <= 3 {
+		return string(runes[:max])
+	}
+	return string(runes[:max-3]) + "..."
+}
 
 func (m Model) View() string {
 	if m.Width == 0 {
@@ -37,13 +51,13 @@ func (m Model) View() string {
 
 	var sb strings.Builder
 
-	header := fmt.Sprintf(" GoClean v1.0 ─ Directory: %s ", m.Current.Path)
+	header := fmt.Sprintf(" GoClean v1.0 ─ Directory: %s ", m.Current.FullPath())
 	sb.WriteString(headerBoxStyle.Width(m.Width).Render(header))
 	sb.WriteString("\n")
 
 	tableHeader := fmt.Sprintf("  %-30s  %10s  %-15s  %6s  %s",
 		"Name", "Size", "% Usage", "Items", "Badge")
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(tableHeader))
+	sb.WriteString(tableHeaderStyle.Render(tableHeader))
 	sb.WriteString("\n")
 
 	items := m.filteredChildren()
@@ -77,10 +91,7 @@ func (m Model) View() string {
 			icon = "📄 "
 		}
 
-		name := item.Name
-		if len(name) > 28 {
-			name = name[:25] + "..."
-		}
+		name := truncateRunes(item.Name, 28)
 
 		tag := ""
 		if item.IsCache {
@@ -107,7 +118,7 @@ func (m Model) View() string {
 
 	// Status / Helper bar
 	if m.StatusMsg != "" {
-		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD600")).Render("⚡ " + m.StatusMsg))
+		sb.WriteString(statusMsgStyle.Render("⚡ " + m.StatusMsg))
 		sb.WriteString("\n")
 	}
 

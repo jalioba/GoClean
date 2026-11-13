@@ -32,7 +32,7 @@ var (
 func renderDeleteDialog(node *model.Node) string {
 	content := fmt.Sprintf("%s\n\nAre you sure you want to permanently delete:\n📁 %s\nSize: %s (%s items)?\n\n[Enter / y] Confirm   [Esc / n] Cancel",
 		modalTitleStyle.Render("⚠️  CONFIRM DELETION"),
-		node.Path,
+		node.FullPath(),
 		ui.FormatBytes(node.Size),
 		ui.FormatNumber(node.ItemCount),
 	)

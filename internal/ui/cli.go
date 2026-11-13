@@ -34,7 +34,7 @@ func RenderCLITree(root *model.Node, maxDepth int, barWidth int) string {
 	if barWidth <= 0 {
 		barWidth = 15
 	}
-	root.SortChildren(model.SortBySize)
+	root.SortChildrenDepth(model.SortBySize, maxDepth)
 
 	var sb strings.Builder
 
